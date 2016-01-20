@@ -28,7 +28,7 @@
 #define TRUNC     'o'
 #define RDWR      'p'
 #define PIPE      'q'
-#define WAIT      'r'
+#define WAIT      'x'
 
 
 int main(int argc, char * argv[])
