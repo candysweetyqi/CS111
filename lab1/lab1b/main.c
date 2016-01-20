@@ -26,6 +26,9 @@
 #define RSYNC     'm'
 #define SYNC      'n'
 #define TRUNC     'o'
+#define RDWR      'p'
+#define PIPE      'q'
+#define WAIT      'r'
 
 
 int main(int argc, char * argv[])
@@ -47,6 +50,9 @@ int main(int argc, char * argv[])
     {"rsync",  no_argument, 0, RSYNC },
     {"sync",  no_argument, 0, SYNC },
     {"trunc", no_argument, 0, TRUNC},
+    {"rdwr", required_argument, 0, RDWR},
+    {"pipe", no_argument, 0, PIPE},
+    {"wait", no_argument, 0, WAIT},
     {0,           0,               0,  0   }  //denote end
   };
 
@@ -157,6 +163,7 @@ int main(int argc, char * argv[])
         oflag=0;
         break;
       }
+
       case WRONLY:
       {
         oflag|=O_WRONLY;
@@ -171,6 +178,33 @@ int main(int argc, char * argv[])
         oflag=0;
         break;
       }
+
+      case RDWR:
+      {
+        oflag|=O_RDwr;
+        if((fd = open(optarg, oflag))!=-1){
+          //printf("read only is hit, the logic fd is %d\n",logic_fd);
+          fd_vec[logic_fd++] = fd;  //store the true fd and make it can be visited via logic fd
+        }
+        else{
+          //printf("\n open() failed with error [%s]\n",strerror(errno));
+          //return 1;
+          fprintf(stderr, "\n open() failed with error [%s]\n",strerror(errno)); /* open failed */ 
+          exit(1);
+        }
+        oflag=0;
+        break;
+      }
+
+      case PIPE:
+      {
+        int pipefd[2];
+        pipe(pipefd);
+        fd_vec[logic_fd++] = pipefd[0];  //read end of pipe
+        fd_vec[logic_fd++] = pipefd[1];  //write end of pipe
+        break;
+      }
+
       case COMMAND:
       {
         pid = fork();
@@ -180,10 +214,15 @@ int main(int argc, char * argv[])
             // Execute command
             if(optarg){
               optind--;
+
+              close(fd_vec[atoi(argv[optind+1])]); //close write end if pipe
               //printf("first logistic fd: %s, real fd is:%d\n", argv[optind],fd_vec[atoi(argv[optind])]);
               dup2(fd_vec[atoi(argv[optind++])],0);
+
+              close(fd_vec[atoi(argv[optind-1])]); //close read end if pipe
               //printf("second logistic fd: %s, real fd is:%d\n", argv[optind],fd_vec[atoi(argv[optind])]);
               dup2(fd_vec[atoi(argv[optind++])],1);
+
               //printf("third logistic fd: %s, real fd is:%d\n", argv[optind],fd_vec[atoi(argv[optind])]);
               dup2(fd_vec[atoi(argv[optind++])],2);
               //optind++;
@@ -204,7 +243,6 @@ int main(int argc, char * argv[])
               exit(0);
               //exit(errno);
               //perror(a[0]);
-
             }  
         }
         // Parent process
